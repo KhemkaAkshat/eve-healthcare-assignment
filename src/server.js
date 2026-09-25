@@ -3,6 +3,15 @@ require("dotenv").config();
 const express = require("express");
 const sequelize = require("./config/database");
 
+const {
+  User,
+  DiagnosticCentre,
+  DiagnosticTest,
+  Booking,
+  Payment,
+  WebhookEvent,
+} = require("./models");
+
 const app = express();
 
 app.use(express.json());
@@ -21,6 +30,7 @@ const startServer = async () => {
     await sequelize.authenticate();
 
     console.log("Database connected successfully");
+    console.log("Models loaded successfully");
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
