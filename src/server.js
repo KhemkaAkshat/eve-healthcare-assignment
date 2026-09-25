@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const sequelize = require("./config/database");
+const authRoutes = require("./routes/authRoutes");
 
 const {
   User,
@@ -15,6 +16,8 @@ const {
 const app = express();
 
 app.use(express.json());
+
+app.use("/api/auth", authRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
