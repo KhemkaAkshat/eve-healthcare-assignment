@@ -14,11 +14,15 @@ const sequelize = require("../config/database");
 const crypto = require("crypto");
 
 const createPayment = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
     // 1. Validate request body
     const validationResult = createPaymentSchema.safeParse(req.body);
 
     if (!validationResult.success) {
+      await transaction.rollback();
+
       return res.status(400).json({
         success: false,
         message: "Validation failed",
@@ -37,31 +41,29 @@ const createPayment = async (req, res) => {
         id: bookingId,
         userId,
       },
+      transaction,
     });
 
     if (!booking) {
+      await transaction.rollback();
+
       return res.status(404).json({
         success: false,
         message: "Booking not found",
       });
     }
 
-    // 4. Booking must be pending
-    if (booking.status !== "PENDING") {
-      return res.status(400).json({
-        success: false,
-        message: `Payment cannot be processed for a ${booking.status} booking`,
-      });
-    }
-
-    // 5. Check if payment already exists
+    // 4. Check if payment already exists
     const existingPayment = await Payment.findOne({
       where: {
         bookingId,
       },
+      transaction,
     });
 
     if (existingPayment) {
+      await transaction.rollback();
+
       return res.status(409).json({
         success: false,
         message: "Payment already exists for this booking",
@@ -69,29 +71,44 @@ const createPayment = async (req, res) => {
       });
     }
 
-    // 6. Generate unique payment reference
+    // 5. Booking must be pending
+    if (booking.status !== "PENDING") {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: `Payment cannot be processed for a ${booking.status} booking`,
+      });
+    }
+
+    // 6. Generate payment reference
     const paymentReference = `PAY_${crypto.randomUUID()}`;
 
-    // 7. Simulate payment result
-    const paymentStatus = Math.random() < 0.8
-      ? "SUCCESS"
-      : "FAILED";
+    // 7. Simulate payment
+    const paymentStatus =
+      Math.random() < 0.8 ? "SUCCESS" : "FAILED";
 
-    // 8. Create payment
-    const payment = await Payment.create({
-      bookingId,
-      paymentReference,
-      amount: booking.amount,
-      status: paymentStatus,
-    });
+    // 8. Create payment inside transaction
+    const payment = await Payment.create(
+      {
+        bookingId,
+        paymentReference,
+        amount: booking.amount,
+        status: paymentStatus,
+      },
+      { transaction }
+    );
 
-    // 9. Update booking based on payment result
+    // 9. Update booking inside same transaction
     booking.status =
       paymentStatus === "SUCCESS"
         ? "CONFIRMED"
         : "FAILED";
 
-    await booking.save();
+    await booking.save({ transaction });
+
+    // 10. Commit transaction
+    await transaction.commit();
 
     return res.status(201).json({
       success: true,
@@ -105,6 +122,9 @@ const createPayment = async (req, res) => {
       },
     });
   } catch (error) {
+    // Rollback everything if anything fails
+    await transaction.rollback();
+
     console.error("Create payment error:", error);
 
     return res.status(500).json({
