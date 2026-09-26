@@ -1,13 +1,15 @@
 const {
   Payment,
   Booking,
-  DiagnosticTest,
-  DiagnosticCentre,
+  WebhookEvent,
 } = require("../models");
 
 const {
   createPaymentSchema,
+  webhookSchema,
 } = require("../validations/paymentValidation");
+
+const sequelize = require("../config/database");
 
 const crypto = require("crypto");
 
@@ -111,7 +113,129 @@ const createPayment = async (req, res) => {
     });
   }
 };
+const handlePaymentWebhook = async (req, res) => {
+  const transaction = await sequelize.transaction();
 
+  try {
+    // 1. Validate webhook payload
+    const validationResult = webhookSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: validationResult.error.issues,
+      });
+    }
+
+    const {
+      eventId,
+      paymentReference,
+      status,
+    } = validationResult.data;
+
+    // 2. Check whether this webhook event was already processed
+    const existingEvent = await WebhookEvent.findOne({
+      where: {
+        eventId,
+      },
+      transaction,
+    });
+
+    if (existingEvent) {
+      await transaction.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: "Webhook event already processed",
+      });
+    }
+
+    // 3. Find the payment
+    const payment = await Payment.findOne({
+      where: {
+        paymentReference,
+      },
+      transaction,
+    });
+
+    if (!payment) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    // 4. Make sure webhook status matches payment
+    if (payment.status !== status) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: "Webhook status does not match payment status",
+      });
+    }
+
+    // 5. Find the associated booking
+    const booking = await Booking.findByPk(payment.bookingId, {
+      transaction,
+    });
+
+    if (!booking) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    // 6. Update booking based on payment result
+    booking.status =
+      status === "SUCCESS"
+        ? "CONFIRMED"
+        : "FAILED";
+
+    await booking.save({ transaction });
+
+    // 7. Record webhook event
+    await WebhookEvent.create(
+      {
+        eventId,
+        paymentReference,
+        status,
+      },
+      { transaction }
+    );
+
+    // 8. Commit all changes together
+    await transaction.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment webhook processed successfully",
+      data: {
+        payment,
+        booking,
+      },
+    });
+  } catch (error) {
+    // Rollback if anything failed
+    await transaction.rollback();
+
+    console.error("Payment webhook error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
 module.exports = {
   createPayment,
+  handlePaymentWebhook
 };
