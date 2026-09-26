@@ -6,6 +6,7 @@ const authRoutes = require("./routes/authRoutes");
 const centreRoutes = require("./routes/centreRoutes");
 const testRoutes = require("./routes/testRoutes")
 const bookingRoutes = require("./routes/bookingRoutes")
+const paymentRoutes = require("./routes/paymentRoutes")
 const {
   User,
   DiagnosticCentre,
@@ -23,6 +24,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/centres", centreRoutes);
 app.use("/api/tests", testRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
