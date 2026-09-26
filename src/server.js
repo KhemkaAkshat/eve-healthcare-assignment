@@ -5,6 +5,7 @@ const sequelize = require("./config/database");
 const authRoutes = require("./routes/authRoutes");
 const centreRoutes = require("./routes/centreRoutes");
 const testRoutes = require("./routes/testRoutes")
+const bookingRoutes = require("./routes/bookingRoutes")
 const {
   User,
   DiagnosticCentre,
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/centres", centreRoutes);
 app.use("/api/tests", testRoutes);
+app.use("/api/bookings", bookingRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
