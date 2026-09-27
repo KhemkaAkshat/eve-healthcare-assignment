@@ -19,7 +19,7 @@ Backend service for diagnostic test bookings and simulated payments, built using
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/KhemkaAkshat/eve-healthcare-assignment.git
 cd eve-healthcare-assignment
 ```
 
@@ -35,7 +35,7 @@ Create a `.env` file in the project root:
 
 ```env
 PORT=5000
-DB_URL=your_postgresql_connection_string
+DB_URL=your_postgresql_connection_string(neon db)
 JWT_SECRET=your_jwt_secret
 ```
 
