@@ -32,7 +32,6 @@ app.get("/health", (req, res) => {
     message: "EVE Healthcare API is running",
   });
 });
-
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
@@ -50,4 +49,8 @@ const startServer = async () => {
   }
 };
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;
